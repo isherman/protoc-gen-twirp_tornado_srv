@@ -194,6 +194,8 @@ import tornado.web
 from google.protobuf import json_format
 from google.protobuf import symbol_database as _symbol_database
 
+from validate.validator import ValidationFailed, validate
+
 _sym_lookup = _symbol_database.Default().GetSymbol
 
 Endpoint = namedtuple("Endpoint", ["name", "function", "input", "output"])
@@ -255,6 +257,13 @@ class TwirpServerException(httplib.HTTPException):
         super(TwirpServerException, self).__init__(message)
 
 
+def validateMessage(message):
+    try:
+        validate(message)(message)
+    except ValidationFailed as e:
+        raise TwirpServerException(Errors.InvalidArgument, str(e))
+
+
 class RequestHandler(tornado.web.RequestHandler):
     def initialize(self, **kwargs):
         """Create a RequestHandler for handling Twirp requests,
@@ -269,6 +278,7 @@ class RequestHandler(tornado.web.RequestHandler):
     def json_decoder(request: tornado.httputil.HTTPServerRequest, data_obj=None):
         data = data_obj()
         json_format.Parse(request.body, data)
+        validateMessage(data)
         return data
 
     @staticmethod
@@ -286,6 +296,7 @@ class RequestHandler(tornado.web.RequestHandler):
     def proto_decoder(request, data_obj=None):
         data = data_obj()
         data.ParseFromString(request.body)
+        validateMessage(data)
         return data
 
     @staticmethod
@@ -329,12 +340,21 @@ class RequestHandler(tornado.web.RequestHandler):
         return endpoint.name, endpoint.function, decoder, encoder
 
     def prepare(self):
-        if(self.request.method != "POST"):
+        if(self.request.method not in ["POST", "OPTIONS"]):
             raise TwirpServerException(
                 Errors.BadRoute,
                 "unsupported method " + self.request.method + " (only POST is allowed)",
                 {"twirp_invalid_route": self.request.method + " " + self.request.path},
             )
+
+    def set_default_headers(self):
+        self.set_header("Access-Control-Allow-Origin", "*")
+        self.set_header("Access-Control-Allow-Headers", "Content-Type")
+        self.set_header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+
+    def options(self):
+        self.set_status(204)
+        self.finish()
 
     def post(self):
         endpoint, func, decode, encode = self.get_endpoint_methods(self.request)
