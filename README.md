@@ -13,7 +13,13 @@ go get -u github.com/isherman/protoc-gen-twirp_tornado_srv
 
 ## Requirements
 
-Generated code requires [tornado](https://pypi.org/project/tornado/) and [protobuf](https://pypi.org/project/protobuf/).
+Generated code requires:
+- [tornado](https://pypi.org/project/tornado/)
+- [protobuf](https://pypi.org/project/protobuf/)
+- `validate/validator.py` from [protoc-gen-validate](https://github.com/envoyproxy/protoc-gen-validate)
+
+`validate/validator.py` is not available on PyPI. It should be copied or symlinked into your `PYTHONPATH`.
+
 
 ## Usage
 
@@ -65,3 +71,9 @@ if __name__ == "__main__":
     app.listen(8888)
     tornado.ioloop.IOLoop.current().start()
 ```
+
+## TODO
+
+- Provide protoc plugin options for
+  - CORS
+  - Validation
